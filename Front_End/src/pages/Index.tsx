@@ -24,7 +24,8 @@ import {
   DialogTitle,
   DialogFooter,
 } from "@/components/ui/dialog";
-import { Search, User, FileText, Pill, ShieldCheck, AlertTriangle, CheckCircle, Loader2 } from "lucide-react";
+import { Search, User, FileText, Pill, ShieldCheck, AlertTriangle, CheckCircle, Loader2, LogOut } from "lucide-react";
+import { useAuth } from "@/contexts/AuthContext";
 import {
   getPatients,
   getPatient,
@@ -41,6 +42,7 @@ import {
 } from "@/lib/api";
 
 export default function Index() {
+  const { provider, logout } = useAuth();
   const [selectedPatientId, setSelectedPatientId] = useState<number | null>(null);
   const [drugSearch, setDrugSearch] = useState("");
   const [submittedDrug, setSubmittedDrug] = useState<string | null>(null);
@@ -176,10 +178,23 @@ export default function Index() {
     <div className="min-h-screen bg-background">
       {/* Header */}
       <header className="border-b bg-card px-6 py-4">
-        <div className="flex items-center gap-3">
-          <ShieldCheck className="h-7 w-7 text-primary" />
-          <h1 className="text-2xl font-bold text-foreground">RxAssist</h1>
-          <span className="text-sm text-muted-foreground">Provider Dashboard</span>
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <ShieldCheck className="h-7 w-7 text-primary" />
+            <h1 className="text-2xl font-bold text-foreground">RxAssist</h1>
+            <span className="text-sm text-muted-foreground">Provider Dashboard</span>
+          </div>
+          {provider && (
+            <div className="flex items-center gap-4">
+              <div className="text-right">
+                <p className="text-sm font-medium">{provider.physicianName}</p>
+                <p className="text-xs text-muted-foreground">{provider.practiceName}</p>
+              </div>
+              <Button variant="ghost" size="icon" onClick={logout} title="Sign out">
+                <LogOut className="h-4 w-4" />
+              </Button>
+            </div>
+          )}
         </div>
       </header>
 
