@@ -5,6 +5,7 @@ from pathlib import Path
 import httpx
 
 from fastapi import FastAPI, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
 
 from datetime import date
 import os
@@ -38,6 +39,14 @@ app = FastAPI(
     title="My Starter API",
     description="A basic FastAPI backend setup",
     version="1.0.0"
+)
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
 class UpdateRequest(BaseModel):
@@ -217,10 +226,7 @@ def get_formulary_coverage(
     )
 
     if not response.data:
-        raise HTTPException(
-            status_code=404,
-            detail=f"No formulary entry found for formulary_id={formulary_id}, rxcui={rxcui}",
-        )
+        return []
 
     return [FormularyResponse(**row) for row in response.data]
 
