@@ -11,11 +11,12 @@ import {
   getPatients,
   getPatient,
   getPlanDetails,
-  getDrugRxcuis,
+  getDrugLookup,
   getFormularyCoverage,
   type PatientDetail,
   type PlanDetails,
   type DrugRxcuiResult,
+  type DrugLookupResponse,
   type FormularyEntry,
 } from "@/lib/api";
 
@@ -46,12 +47,14 @@ export default function Index() {
     enabled: !!patient,
   });
 
-  // Step 4: Search drug via RxNav and get RxCUI options
-  const { data: rxcuiOptions, isLoading: loadingRxcuis } = useQuery({
-    queryKey: ["rxcuis", submittedDrug],
-    queryFn: () => getDrugRxcuis(submittedDrug!),
-    enabled: !!submittedDrug,
+  // Step 4: Search drug via formulary-aware lookup
+  const { data: drugLookup, isLoading: loadingRxcuis } = useQuery({
+    queryKey: ["drugLookup", patient?.formulary_id, submittedDrug],
+    queryFn: () => getDrugLookup(patient!.formulary_id, submittedDrug!),
+    enabled: !!submittedDrug && !!patient?.formulary_id,
   });
+
+  const rxcuiOptions = drugLookup?.covered_results;
 
   // Step 5: Formulary check
   const { data: formularyResults, isLoading: loadingFormulary, isError: formularyError } = useQuery({

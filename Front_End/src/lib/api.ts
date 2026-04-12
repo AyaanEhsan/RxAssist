@@ -75,11 +75,21 @@ export async function getPlanDetails(
   return fetchJson<PlanDetails>(`${BASE_URL}/plans?${params}`);
 }
 
-export async function getDrugRxcuis(drugName: string): Promise<DrugRxcuiResult[]> {
-  const data = await fetchJson<{ drug: string; results: DrugRxcuiResult[] }>(
-    `${BASE_URL}/drug-rxcuis/${encodeURIComponent(drugName)}`
+export interface DrugLookupResponse {
+  drug: string;
+  formulary_id: string;
+  covered_results: DrugRxcuiResult[];
+  total_rxcuis_found: number;
+  covered_count: number;
+}
+
+export async function getDrugLookup(
+  formularyId: string,
+  drugName: string
+): Promise<DrugLookupResponse> {
+  return fetchJson<DrugLookupResponse>(
+    `${BASE_URL}/formulary/${encodeURIComponent(formularyId)}/drug-lookup/${encodeURIComponent(drugName)}`
   );
-  return data.results;
 }
 
 export async function getFormularyCoverage(
