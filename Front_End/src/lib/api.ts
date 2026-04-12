@@ -99,3 +99,50 @@ export async function getFormularyCoverage(
   const params = new URLSearchParams({ formulary_id, rxcui });
   return fetchJson<FormularyEntry[]>(`${BASE_URL}/formulary_for_provider?${params}`);
 }
+
+export interface PriorAuthDraftRequest {
+  patient_name: string;
+  primary_diagnosis_code?: string;
+  primary_diagnosis_desc?: string;
+  history_of_present_illness?: string;
+  physical_exam_notes?: string;
+  previous_failed_therapies?: string[];
+  relevant_lab_results?: Record<string, unknown>;
+
+  contract_id: string;
+  plan_id: string;
+  segment_id: string;
+  formulary_id: string;
+  contract_name?: string;
+  plan_name?: string;
+  state?: string;
+
+  drug_name: string;
+  rxcui: string;
+  ndc?: string;
+  tier_level_value?: number;
+
+  prior_authorization_yn?: string;
+  step_therapy_yn?: string;
+  quantity_limit_yn?: string;
+  quantity_limit_amount?: string;
+  quantity_limit_days?: string;
+}
+
+export interface PriorAuthDraftResponse {
+  status: string;
+  draft_letter: string;
+  payload: Record<string, unknown>;
+}
+
+export async function draftPriorAuth(
+  body: PriorAuthDraftRequest
+): Promise<PriorAuthDraftResponse> {
+  const res = await fetch(`${BASE_URL}/prior-auth/draft`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) throw new Error(`API error: ${res.status}`);
+  return res.json();
+}

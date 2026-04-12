@@ -440,7 +440,14 @@ async def draft_prior_auth(req: PriorAuthDraftRequest):
     ]
 
     response = await llm.ainvoke(messages)
-    draft_letter = response.content
+    content = response.content
+
+    if isinstance(content, list):
+        draft_letter = "\n".join(
+            block["text"] for block in content if isinstance(block, dict) and block.get("type") == "text"
+        )
+    else:
+        draft_letter = content
 
     print("\n── Generated Prior Auth Letter ──")
     print(draft_letter)

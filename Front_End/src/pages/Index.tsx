@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
+import ReactMarkdown from "react-markdown";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
@@ -16,6 +17,14 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from "@/components/ui/dialog";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import { Search, User, FileText, Pill, ShieldCheck, AlertTriangle, CheckCircle, Loader2 } from "lucide-react";
 import {
   getPatients,
@@ -23,11 +32,13 @@ import {
   getPlanDetails,
   getDrugLookup,
   getFormularyCoverage,
+  draftPriorAuth,
   type PatientDetail,
   type PlanDetails,
   type DrugRxcuiResult,
   type DrugLookupResponse,
   type FormularyEntry,
+  type PriorAuthDraftRequest,
 } from "@/lib/api";
 
 export default function Index() {
@@ -37,6 +48,11 @@ export default function Index() {
   const [selectedRxcui, setSelectedRxcui] = useState<string | null>(null);
   const [priorAuthDialogOpen, setPriorAuthDialogOpen] = useState(false);
   const [pendingEntry, setPendingEntry] = useState<FormularyEntry | null>(null);
+
+  const [draftLoading, setDraftLoading] = useState(false);
+  const [draftLetter, setDraftLetter] = useState<string | null>(null);
+  const [draftError, setDraftError] = useState<string | null>(null);
+  const [letterDialogOpen, setLetterDialogOpen] = useState(false);
 
   // Step 1: Load patients
   const { data: patients, isLoading: loadingPatients } = useQuery({
@@ -103,10 +119,58 @@ export default function Index() {
     }
   };
 
-  const handleConfirmPriorAuth = () => {
-    // TODO: handle confirmed prior auth action (e.g. start PA workflow)
+  const handleConfirmPriorAuth = async () => {
+    if (!patient || !pendingEntry) return;
+
+    const selectedDrugOption = rxcuiOptions?.find(
+      (opt) => opt.rxcui === pendingEntry.rxcui
+    );
+    const drugName = selectedDrugOption?.name ?? submittedDrug ?? "Unknown";
+
+    const body: PriorAuthDraftRequest = {
+      patient_name: patient.patient_name,
+      primary_diagnosis_code: patient.primary_diagnosis_code,
+      primary_diagnosis_desc: patient.primary_diagnosis_desc,
+      history_of_present_illness: patient.history_of_present_illness,
+      physical_exam_notes: patient.physical_exam_notes,
+      previous_failed_therapies: patient.previous_failed_therapies,
+      relevant_lab_results: patient.relevant_lab_results,
+
+      contract_id: patient.contract_id,
+      plan_id: patient.plan_id,
+      segment_id: patient.segment_id,
+      formulary_id: patient.formulary_id,
+      contract_name: plan?.contract_name,
+      plan_name: plan?.plan_name,
+      state: plan?.state,
+
+      drug_name: drugName,
+      rxcui: pendingEntry.rxcui,
+      ndc: pendingEntry.ndc,
+      tier_level_value: pendingEntry.tier_level_value,
+
+      prior_authorization_yn: pendingEntry.prior_authorization_yn,
+      step_therapy_yn: pendingEntry.step_therapy_yn,
+      quantity_limit_yn: pendingEntry.quantity_limit_yn,
+      quantity_limit_amount: pendingEntry.quantity_limit_amount,
+      quantity_limit_days: pendingEntry.quantity_limit_days,
+    };
+
     setPriorAuthDialogOpen(false);
     setPendingEntry(null);
+    setDraftLoading(true);
+    setDraftLetter(null);
+    setDraftError(null);
+    setLetterDialogOpen(true);
+
+    try {
+      const result = await draftPriorAuth(body);
+      setDraftLetter(result.draft_letter);
+    } catch (err) {
+      setDraftError(err instanceof Error ? err.message : "Failed to generate PA letter.");
+    } finally {
+      setDraftLoading(false);
+    }
   };
 
   return (
@@ -420,6 +484,63 @@ export default function Index() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <Dialog open={letterDialogOpen} onOpenChange={setLetterDialogOpen}>
+        <DialogContent className="max-w-3xl max-h-[90vh] flex flex-col">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <FileText className="h-5 w-5 text-primary" />
+              Prior Authorization Draft Letter
+            </DialogTitle>
+          </DialogHeader>
+
+          {draftLoading && (
+            <div className="flex flex-col items-center justify-center py-16 gap-3">
+              <Loader2 className="h-8 w-8 animate-spin text-primary" />
+              <p className="text-sm text-muted-foreground">
+                Generating Prior Authorization letter...
+              </p>
+            </div>
+          )}
+
+          {draftError && (
+            <div className="flex flex-col items-center justify-center py-16 gap-3 text-destructive">
+              <AlertTriangle className="h-8 w-8" />
+              <p className="text-sm font-medium">{draftError}</p>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setLetterDialogOpen(false)}
+              >
+                Close
+              </Button>
+            </div>
+          )}
+
+          {draftLetter && (
+            <>
+              <ScrollArea className="flex-1 min-h-0 rounded-md border p-6">
+                <article className="prose prose-sm max-w-none dark:prose-invert">
+                  <ReactMarkdown>{draftLetter}</ReactMarkdown>
+                </article>
+              </ScrollArea>
+              <DialogFooter className="gap-2 sm:gap-0">
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    navigator.clipboard.writeText(draftLetter);
+                  }}
+                >
+                  Copy to Clipboard
+                </Button>
+                <Button onClick={() => setLetterDialogOpen(false)}>
+                  Close
+                </Button>
+              </DialogFooter>
+            </>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
