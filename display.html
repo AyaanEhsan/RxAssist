@@ -1,0 +1,422 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>RxAssist — Check for updates</title>
+  <style>
+    :root {
+      --bg: #0f1419;
+      --bg-elevated: #161d26;
+      --surface: #1c2630;
+      --border: #2d3d4d;
+      --text: #e8eef4;
+      --muted: #8fa3b5;
+      --accent: #2dd4bf;
+      --accent-dim: #14b8a6;
+      --danger: #f87171;
+      --radius: 12px;
+      --font: "Segoe UI", system-ui, -apple-system, sans-serif;
+      --mono: ui-monospace, "Cascadia Code", "Consolas", monospace;
+      --shadow: 0 8px 32px rgba(0, 0, 0, 0.35);
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      font-family: var(--font);
+      color: var(--text);
+      background: radial-gradient(ellipse 120% 80% at 50% -20%, #1a3d38 0%, var(--bg) 50%);
+      line-height: 1.5;
+    }
+
+    .page {
+      max-width: 920px;
+      margin: 0 auto;
+      padding: 2rem 1.25rem 3rem;
+    }
+
+    header {
+      margin-bottom: 1.75rem;
+    }
+
+    header h1 {
+      font-size: 1.5rem;
+      font-weight: 600;
+      letter-spacing: -0.02em;
+      margin: 0 0 0.35rem;
+    }
+
+    header p {
+      margin: 0;
+      color: var(--muted);
+      font-size: 0.95rem;
+    }
+
+    header code {
+      font-family: var(--mono);
+      font-size: 0.88em;
+      color: var(--accent);
+      background: var(--surface);
+      padding: 0.12em 0.4em;
+      border-radius: 6px;
+      border: 1px solid var(--border);
+    }
+
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 1.35rem 1.4rem;
+      margin-bottom: 1.25rem;
+      box-shadow: var(--shadow);
+    }
+
+    .card h2 {
+      font-size: 0.78rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: var(--muted);
+      margin: 0 0 1rem;
+    }
+
+    .field-grid {
+      display: grid;
+      gap: 1rem 1.25rem;
+    }
+
+    @media (min-width: 560px) {
+      .field-grid.cols-2 {
+        grid-template-columns: 1fr 1fr;
+      }
+    }
+
+    label {
+      display: block;
+      font-size: 0.8rem;
+      font-weight: 600;
+      color: var(--muted);
+      margin-bottom: 0.35rem;
+    }
+
+    .label-hint {
+      font-weight: 400;
+      opacity: 0.88;
+    }
+
+    input[type="text"],
+    input[type="url"],
+    input[type="date"],
+    textarea {
+      width: 100%;
+      padding: 0.65rem 0.75rem;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      background: var(--bg-elevated);
+      color: var(--text);
+      font-family: var(--font);
+      font-size: 0.95rem;
+      transition: border-color 0.15s, box-shadow 0.15s;
+    }
+
+    textarea {
+      min-height: 5rem;
+      resize: vertical;
+      font-family: var(--mono);
+      font-size: 0.88rem;
+    }
+
+    input:focus,
+    textarea:focus {
+      outline: none;
+      border-color: var(--accent-dim);
+      box-shadow: 0 0 0 3px rgba(45, 212, 191, 0.2);
+    }
+
+    .actions {
+      margin-top: 1.15rem;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.75rem;
+      align-items: center;
+    }
+
+    button#go {
+      font-family: var(--font);
+      font-weight: 600;
+      font-size: 0.95rem;
+      padding: 0.65rem 1.35rem;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      color: #042f2e;
+      background: linear-gradient(180deg, var(--accent) 0%, var(--accent-dim) 100%);
+      box-shadow: 0 2px 16px rgba(45, 212, 191, 0.25);
+      transition: filter 0.15s, transform 0.1s;
+    }
+
+    button#go:hover {
+      filter: brightness(1.08);
+    }
+
+    button#go:active {
+      transform: translateY(1px);
+    }
+
+    #error {
+      margin: 0.75rem 0 0;
+      padding: 0.65rem 0.85rem;
+      border-radius: 8px;
+      background: rgba(248, 113, 113, 0.12);
+      border: 1px solid rgba(248, 113, 113, 0.35);
+      color: var(--danger);
+      font-size: 0.9rem;
+      white-space: pre-wrap;
+      display: none;
+    }
+
+    #error:not(:empty) {
+      display: block;
+    }
+
+    #tableWrap {
+      margin-top: 0.5rem;
+    }
+
+    #tableWrap:empty {
+      display: none;
+    }
+
+    .results-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.9rem;
+      border-radius: 8px;
+      overflow: hidden;
+      border: 1px solid var(--border);
+    }
+
+    .results-table th,
+    .results-table td {
+      padding: 0.65rem 0.85rem;
+      text-align: left;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .results-table th {
+      background: var(--bg-elevated);
+      color: var(--muted);
+      font-weight: 600;
+      font-size: 0.72rem;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    .results-table tbody tr:last-child td {
+      border-bottom: none;
+    }
+
+    .results-table tbody tr:nth-child(even) {
+      background: rgba(0, 0, 0, 0.15);
+    }
+
+    .results-table tbody tr:hover {
+      background: rgba(45, 212, 191, 0.06);
+    }
+
+    .results-table td {
+      font-variant-numeric: tabular-nums;
+    }
+
+    .results-table td.mono {
+      font-family: var(--mono);
+      font-size: 0.82rem;
+    }
+
+    .badge {
+      display: inline-block;
+      padding: 0.2rem 0.55rem;
+      border-radius: 999px;
+      font-size: 0.75rem;
+      font-weight: 600;
+    }
+
+    .badge-yes {
+      background: rgba(248, 113, 113, 0.2);
+      color: #fca5a5;
+    }
+
+    .badge-no {
+      background: rgba(45, 212, 191, 0.15);
+      color: var(--accent);
+    }
+
+    .json-panel {
+      margin: 0;
+      padding: 1rem 1.1rem;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      font-family: var(--mono);
+      font-size: 0.82rem;
+      line-height: 1.45;
+      overflow: auto;
+      max-height: min(50vh, 420px);
+      color: #cbd5e1;
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
+
+    .json-panel:empty::before {
+      content: "Response JSON will appear here after a successful request.";
+      color: var(--muted);
+      font-style: italic;
+    }
+
+    footer.page-foot {
+      margin-top: 2rem;
+      font-size: 0.8rem;
+      color: var(--muted);
+      text-align: center;
+    }
+  </style>
+</head>
+<body>
+  <div class="page">
+    <header>
+      <h1>Formulary tier check</h1>
+      <p>POST to <code>/check_for_updates</code> with your formulary, RXCUIs, and date range.</p>
+    </header>
+
+    <section class="card" aria-labelledby="form-heading">
+      <h2 id="form-heading">Request</h2>
+      <div class="field-grid">
+        <div>
+          <label for="baseUrl">Base URL</label>
+          <input id="baseUrl" type="url" value="http://127.0.0.1:8000" autocomplete="off" />
+        </div>
+        <div>
+          <label for="formularyId">formulary_id</label>
+          <input id="formularyId" type="text" value="26321" autocomplete="off" />
+        </div>
+        <div class="field-grid cols-2">
+          <div>
+            <label for="start">data_date_start</label>
+            <input id="start" type="date" value="2026-01-22" />
+          </div>
+          <div>
+            <label for="end">data_date_end</label>
+            <input id="end" type="date" value="2026-02-19" />
+          </div>
+        </div>
+        <div>
+          <label for="rxcuis">rxcuis <span class="label-hint">(comma or newline separated)</span></label>
+          <textarea id="rxcuis" spellcheck="false">2639727, 1592748</textarea>
+        </div>
+      </div>
+      <div class="actions">
+        <button type="button" id="go">Send request</button>
+      </div>
+      <p id="error" role="alert"></p>
+    </section>
+
+    <section class="card" aria-labelledby="results-heading">
+      <h2 id="results-heading">Results</h2>
+      <div id="tableWrap"></div>
+      <h2 style="margin-top: 1.25rem;">Raw JSON</h2>
+      <pre id="raw" class="json-panel"></pre>
+    </section>
+
+    <footer class="page-foot">RxAssist · local API tester</footer>
+  </div>
+
+  <script>
+    function parseRxcuis(text) {
+      return text
+        .split(/[\s,]+/)
+        .map((s) => s.trim())
+        .filter(Boolean);
+    }
+
+    function esc(s) {
+      return String(s)
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;");
+    }
+
+    function cellHtml(key, value) {
+      if (key === "has_tier_changed" && (value === true || value === false)) {
+        const cls = value ? "badge-yes" : "badge-no";
+        const label = value ? "Yes" : "No";
+        return `<td><span class="badge ${cls}">${label}</span></td>`;
+      }
+      if (key === "ndc") {
+        return `<td class="mono">${esc(value == null ? "" : value)}</td>`;
+      }
+      return `<td>${esc(value == null ? "" : value)}</td>`;
+    }
+
+    function renderTable(rows) {
+      if (!Array.isArray(rows) || !rows.length || typeof rows[0] !== "object") return "";
+      const keys = Object.keys(rows[0]);
+      const th = keys.map((k) => `<th>${esc(k)}</th>`).join("");
+      const tr = rows
+        .map(
+          (r) =>
+            "<tr>" + keys.map((k) => cellHtml(k, r[k])).join("") + "</tr>"
+        )
+        .join("");
+      return `<table class="results-table"><thead><tr>${th}</tr></thead><tbody>${tr}</tbody></table>`;
+    }
+
+    document.getElementById("go").addEventListener("click", async () => {
+      const err = document.getElementById("error");
+      const raw = document.getElementById("raw");
+      const tableWrap = document.getElementById("tableWrap");
+      err.textContent = "";
+      raw.textContent = "";
+      tableWrap.innerHTML = "";
+
+      const base = document.getElementById("baseUrl").value.replace(/\/+$/, "");
+      const body = {
+        formulary_id: document.getElementById("formularyId").value.trim(),
+        rxcuis: parseRxcuis(document.getElementById("rxcuis").value),
+        data_date_start: document.getElementById("start").value,
+        data_date_end: document.getElementById("end").value,
+      };
+
+      try {
+        const res = await fetch(`${base}/check_for_updates`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(body),
+        });
+        const text = await res.text();
+        let data;
+        try {
+          data = JSON.parse(text);
+        } catch {
+          throw new Error(res.ok ? "Response was not valid JSON." : `${res.status} ${res.statusText}\n${text.slice(0, 800)}`);
+        }
+        if (!res.ok) {
+          throw new Error(`${res.status}: ${typeof data === "object" ? JSON.stringify(data) : text}`);
+        }
+
+        raw.textContent = JSON.stringify(data, null, 2);
+        if (Array.isArray(data) && data.length && typeof data[0] === "object" && "rxcui" in data[0]) {
+          tableWrap.innerHTML = renderTable(data);
+        }
+      } catch (e) {
+        err.textContent = e.message || String(e);
+      }
+    });
+  </script>
+</body>
+</html>

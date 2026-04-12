@@ -1,7 +1,11 @@
 from __future__ import annotations
 
+from pathlib import Path
+
 from fastapi import FastAPI
 from fastapi.exceptions import HTTPException
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse
 
 from datetime import date
 import os
@@ -31,13 +35,13 @@ load_dotenv()
 
 
 
-class CheckForUpdateRequest(BaseModel):
-    rxcuis: list[str]
-    formulary_id: str
-    data_date_start: date
-    data_date_end: date
-    patient_name: str    # e.g. "John Doe"
-    patient_email: str   # e.g. "john.doe@gmail.com"
+# class CheckForUpdateRequest(BaseModel):
+#     rxcuis: list[str]
+#     formulary_id: str
+#     data_date_start: date
+#     data_date_end: date
+#     patient_name: str    # e.g. "John Doe"
+#     patient_email: str   # e.g. "john.doe@gmail.com"
 
 url = os.getenv("SUPABASE_URL")
 key = os.getenv("SUPABASE_KEY")
@@ -56,12 +60,39 @@ app = FastAPI(
     version="1.0.0"
 )
 
+PROJECT_ROOT = Path(__file__).resolve().parent.parent
+
+# CORS: browser preflight (OPTIONS) needs this when the UI is served from another
+# origin (file://, Live Server, or another port). Set CORS_ORIGINS in .env to a
+# comma-separated list for production; leave unset for local dev (*).
+_cors_origins = os.getenv("CORS_ORIGINS", "").strip()
+if _cors_origins:
+    _allow_origins = [o.strip() for o in _cors_origins.split(",") if o.strip()]
+else:
+    _allow_origins = ["*"]
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=_allow_origins,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 
 # 2. Define a basic GET route
 @app.get("/")
 def read_root():
     return {"message": "Welcome to your FastAPI backend!"}
+
+
+@app.get("/display.html", include_in_schema=False)
+def serve_display_page():
+    """Same-origin UI for check_for_updates (avoids CORS when opened via this URL)."""
+    path = PROJECT_ROOT / "display.html"
+    if not path.is_file():
+        raise HTTPException(status_code=404, detail="display.html not found")
+    return FileResponse(path, media_type="text/html; charset=utf-8")
+
 
 # 3. Define a route with a path parameter
 @app.get("/items/{item_id}")
@@ -87,6 +118,9 @@ def check_for_updates(payload: CheckForUpdateRequest):
 
     all_results = []
 
+    patient_name = os.getenv("PATIENT_NAME")
+    patient_email = os.getenv("PATIENT_EMAIL")
+
     for rxcui in rxcui_list:
         result = get_tier_changes(
             supabase=supabase_client,
@@ -102,17 +136,19 @@ def check_for_updates(payload: CheckForUpdateRequest):
             continue
         if isinstance(result, dict) and "error" in result:
             print(f"Error for RXCUI {rxcui}: {result['error']}")
-            continue
+            # continue
 
         # result is a list of TierChange objects — extend, not append
         all_results.extend(result)  # 👈 KEY FIX: was append(), now extend()
+        print(result)
 
     # Generate and send email
     generate_and_send_email(
-        recipient_email=payload.patient_email,
-        patient_name=payload.patient_name,
+        recipient_email=patient_email,
+        patient_name=patient_name,
         tier_changes=all_results  # now a flat list of TierChange objects ✅
     )
+    return all_results
 
 
 

@@ -1,0 +1,428 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>RxAssist — Check for updates</title>
+  <style>
+    :root {
+      --bg: #0f1419;
+      --panel: #1a222c;
+      --border: #2d3a47;
+      --text: #e8eef4;
+      --muted: #8fa3b5;
+      --accent: #3d9cf0;
+      --accent-dim: #2b7fc4;
+      --danger: #f06b6b;
+      --ok: #5bd39a;
+      --warn: #e9c46a;
+      --radius: 10px;
+      --font: "Segoe UI", system-ui, -apple-system, sans-serif;
+      --mono: ui-monospace, "Cascadia Code", "Consolas", monospace;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      font-family: var(--font);
+      background: radial-gradient(1200px 600px at 10% -10%, #1a2a3d 0%, var(--bg) 55%);
+      color: var(--text);
+      line-height: 1.5;
+    }
+    .wrap {
+      max-width: 920px;
+      margin: 0 auto;
+      padding: 2rem 1.25rem 3rem;
+    }
+    header {
+      margin-bottom: 1.75rem;
+    }
+    header h1 {
+      font-size: 1.35rem;
+      font-weight: 600;
+      margin: 0 0 0.35rem;
+      letter-spacing: -0.02em;
+    }
+    header p {
+      margin: 0;
+      color: var(--muted);
+      font-size: 0.95rem;
+    }
+    .grid {
+      display: grid;
+      gap: 1rem;
+    }
+    @media (min-width: 640px) {
+      .grid-2 { grid-template-columns: 1fr 1fr; }
+    }
+    .card {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 1.25rem 1.35rem;
+    }
+    label {
+      display: block;
+      font-size: 0.8rem;
+      font-weight: 600;
+      color: var(--muted);
+      margin-bottom: 0.35rem;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+    input[type="text"],
+    input[type="url"],
+    input[type="date"],
+    textarea {
+      width: 100%;
+      padding: 0.65rem 0.75rem;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      background: #121920;
+      color: var(--text);
+      font-family: var(--font);
+      font-size: 0.95rem;
+    }
+    textarea {
+      min-height: 110px;
+      resize: vertical;
+      font-family: var(--mono);
+      font-size: 0.88rem;
+    }
+    input:focus, textarea:focus {
+      outline: 2px solid rgba(61, 156, 240, 0.35);
+      border-color: var(--accent);
+    }
+    .row-actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.75rem;
+      align-items: center;
+      margin-top: 1rem;
+    }
+    button.primary {
+      font-family: var(--font);
+      font-weight: 600;
+      font-size: 0.95rem;
+      padding: 0.65rem 1.25rem;
+      border: none;
+      border-radius: 8px;
+      background: linear-gradient(180deg, var(--accent) 0%, var(--accent-dim) 100%);
+      color: #fff;
+      cursor: pointer;
+      box-shadow: 0 2px 12px rgba(61, 156, 240, 0.25);
+    }
+    button.primary:hover:not(:disabled) {
+      filter: brightness(1.06);
+    }
+    button.primary:disabled {
+      opacity: 0.55;
+      cursor: not-allowed;
+    }
+    .hint {
+      font-size: 0.82rem;
+      color: var(--muted);
+    }
+    .status {
+      font-size: 0.85rem;
+      min-height: 1.4em;
+    }
+    .status.error { color: var(--danger); }
+    .status.ok { color: var(--ok); }
+    .status.warn { color: var(--warn); }
+    h2 {
+      font-size: 1rem;
+      font-weight: 600;
+      margin: 0 0 0.75rem;
+    }
+    .result-meta {
+      font-size: 0.85rem;
+      color: var(--muted);
+      margin-bottom: 1rem;
+    }
+    .change-block {
+      margin-bottom: 1.25rem;
+      padding-bottom: 1.25rem;
+      border-bottom: 1px solid var(--border);
+    }
+    .change-block:last-child {
+      border-bottom: none;
+      margin-bottom: 0;
+      padding-bottom: 0;
+    }
+    .change-title {
+      font-family: var(--mono);
+      font-size: 0.88rem;
+      color: var(--accent);
+      margin-bottom: 0.5rem;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.86rem;
+    }
+    th, td {
+      text-align: left;
+      padding: 0.5rem 0.6rem;
+      border-bottom: 1px solid var(--border);
+    }
+    th {
+      color: var(--muted);
+      font-weight: 600;
+      font-size: 0.75rem;
+      text-transform: uppercase;
+      letter-spacing: 0.03em;
+    }
+    tr:last-child td { border-bottom: none; }
+    .badge {
+      display: inline-block;
+      padding: 0.15rem 0.45rem;
+      border-radius: 6px;
+      font-size: 0.75rem;
+      font-weight: 600;
+    }
+    .badge.yes { background: rgba(240, 107, 107, 0.2); color: var(--danger); }
+    .badge.no { background: rgba(91, 211, 154, 0.15); color: var(--ok); }
+    pre.raw {
+      margin: 0;
+      padding: 1rem;
+      background: #121920;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      overflow: auto;
+      font-family: var(--mono);
+      font-size: 0.78rem;
+      line-height: 1.45;
+      max-height: 420px;
+    }
+    .tabs {
+      display: flex;
+      gap: 0.5rem;
+      margin-bottom: 0.75rem;
+    }
+    .tabs button {
+      font-family: var(--font);
+      font-size: 0.82rem;
+      padding: 0.4rem 0.75rem;
+      border-radius: 6px;
+      border: 1px solid var(--border);
+      background: #121920;
+      color: var(--muted);
+      cursor: pointer;
+    }
+    .tabs button.active {
+      color: var(--text);
+      border-color: var(--accent);
+      background: rgba(61, 156, 240, 0.12);
+    }
+    .panel-hidden { display: none; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <h1>Check for formulary updates</h1>
+      <p>POST to <code style="color: var(--accent);">/check_for_updates</code> with formulary ID, RXCUIs, and a date range.</p>
+    </header>
+
+    <form id="form" class="card">
+      <div class="grid" style="margin-bottom: 1rem;">
+        <div>
+          <label for="baseUrl">API base URL</label>
+          <input type="url" id="baseUrl" value="http://127.0.0.1:8000" autocomplete="off" />
+        </div>
+        <div>
+          <label for="formularyId">Formulary ID</label>
+          <input type="text" id="formularyId" value="26321" inputmode="numeric" />
+        </div>
+      </div>
+      <div class="grid grid-2" style="margin-bottom: 1rem;">
+        <div>
+          <label for="start">Data date start</label>
+          <input type="date" id="start" value="2026-01-22" />
+        </div>
+        <div>
+          <label for="end">Data date end</label>
+          <input type="date" id="end" value="2026-02-19" />
+        </div>
+      </div>
+      <div>
+        <label for="rxcuis">RXCUIs</label>
+        <textarea id="rxcuis" placeholder="One per line, or comma-separated">2639727
+1592748
+644088</textarea>
+        <p class="hint">Whitespace, commas, or newlines separate RXCUIs. Empty tokens are ignored.</p>
+      </div>
+      <div class="row-actions">
+        <button type="submit" class="primary" id="submitBtn">Run check</button>
+        <span class="status" id="status"></span>
+      </div>
+    </form>
+
+    <section class="card" style="margin-top: 1.25rem;" id="resultSection" hidden>
+      <h2>Response</h2>
+      <p class="result-meta" id="resultMeta"></p>
+      <div class="tabs">
+        <button type="button" class="active" data-tab="summary">Summary</button>
+        <button type="button" data-tab="raw">Raw JSON</button>
+      </div>
+      <div id="tabSummary"></div>
+      <pre class="raw panel-hidden" id="tabRaw"></pre>
+    </section>
+  </div>
+
+  <script>
+    const $ = (id) => document.getElementById(id);
+
+    function parseRxcuis(text) {
+      return text
+        .split(/[\s,]+/)
+        .map((s) => s.trim())
+        .filter(Boolean);
+    }
+
+    function esc(s) {
+      return String(s)
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;");
+    }
+
+    function renderChangeItem(item, index, rxcuiHint) {
+      const title = rxcuiHint != null
+        ? `Results for RXCUI ${esc(rxcuiHint)} (index ${index})`
+        : `Result block ${index + 1}`;
+
+      if (typeof item === "string") {
+        return `<div class="change-block"><div class="change-title">${esc(title)}</div><p style="margin:0;color:var(--muted)">${esc(item)}</p></div>`;
+      }
+      if (item && typeof item === "object" && !Array.isArray(item) && item.error) {
+        return `<div class="change-block"><div class="change-title">${esc(title)}</div><p style="margin:0;color:var(--danger)">${esc(item.error)}</p></div>`;
+      }
+      if (Array.isArray(item) && item.length && typeof item[0] === "object" && "rxcui" in item[0]) {
+        const rows = item.map((row) => {
+          const changed = row.has_tier_changed;
+          const badge = changed
+            ? '<span class="badge yes">Changed</span>'
+            : '<span class="badge no">Same</span>';
+          return `<tr>
+            <td>${esc(row.rxcui)}</td>
+            <td style="font-family:var(--mono);font-size:0.82rem">${esc(row.ndc)}</td>
+            <td>${badge}</td>
+            <td>${esc(row.tier_before)}</td>
+            <td>${esc(row.tier_after)}</td>
+          </tr>`;
+        }).join("");
+        return `<div class="change-block">
+          <div class="change-title">${esc(title)}</div>
+          <table><thead><tr>
+            <th>RXCUI</th><th>NDC</th><th>Tier change</th><th>Tier before</th><th>Tier after</th>
+          </tr></thead><tbody>${rows}</tbody></table>
+        </div>`;
+      }
+      return `<div class="change-block"><div class="change-title">${esc(title)}</div><pre class="raw" style="max-height:220px">${esc(JSON.stringify(item, null, 2))}</pre></div>`;
+    }
+
+    $("form").addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const base = $("baseUrl").value.replace(/\/+$/, "");
+      const formulary_id = $("formularyId").value.trim();
+      const data_date_start = $("start").value;
+      const data_date_end = $("end").value;
+      const rxcuis = parseRxcuis($("rxcuis").value);
+
+      const statusEl = $("status");
+      const btn = $("submitBtn");
+      const section = $("resultSection");
+
+      statusEl.className = "status";
+      statusEl.textContent = "";
+      section.hidden = true;
+
+      if (!formulary_id) {
+        statusEl.classList.add("error");
+        statusEl.textContent = "Formulary ID is required.";
+        return;
+      }
+      if (!data_date_start || !data_date_end) {
+        statusEl.classList.add("error");
+        statusEl.textContent = "Both dates are required.";
+        return;
+      }
+      if (!rxcuis.length) {
+        statusEl.classList.add("error");
+        statusEl.textContent = "Enter at least one RXCUI.";
+        return;
+      }
+
+      const body = { formulary_id, rxcuis, data_date_start, data_date_end };
+      btn.disabled = true;
+      statusEl.classList.add("warn");
+      statusEl.textContent = "Requesting…";
+
+      try {
+        const res = await fetch(`${base}/check_for_updates`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(body),
+        });
+        const text = await res.text();
+        let data;
+        try {
+          data = JSON.parse(text);
+        } catch {
+          throw new Error(res.ok ? "Response was not JSON." : `${res.status} ${res.statusText}\n${text.slice(0, 500)}`);
+        }
+        if (!res.ok) {
+          const detail = data.detail != null ? JSON.stringify(data.detail) : JSON.stringify(data);
+          throw new Error(`${res.status}: ${detail}`);
+        }
+
+        statusEl.classList.remove("warn");
+        statusEl.classList.add("ok");
+        statusEl.textContent = "Success.";
+
+        $("resultMeta").textContent =
+          `Range: ${data.start_date ?? data_date_start} → ${data.end_date ?? data_date_end} · Status: ${data.status ?? "—"}`;
+
+        const changes = Array.isArray(data.changes) ? data.changes : [];
+        const rxcuisSent = rxcuis;
+        const summaryHtml = changes.length
+          ? changes.map((item, i) => renderChangeItem(item, i, rxcuisSent[i])).join("")
+          : "<p style=\"margin:0;color:var(--muted)\">No <code>changes</code> array in response.</p>";
+
+        $("tabSummary").innerHTML = summaryHtml;
+        $("tabRaw").textContent = JSON.stringify(data, null, 2);
+        section.hidden = false;
+        switchTab("summary");
+      } catch (err) {
+        statusEl.classList.remove("warn");
+        statusEl.classList.add("error");
+        statusEl.textContent = err.message || String(err);
+        $("resultMeta").textContent = "";
+        $("tabSummary").innerHTML = `<p style="margin:0;color:var(--danger)">${esc(statusEl.textContent)}</p>`;
+        $("tabRaw").textContent = "";
+        section.hidden = false;
+        switchTab("summary");
+      } finally {
+        btn.disabled = false;
+      }
+    });
+
+    function switchTab(name) {
+      document.querySelectorAll(".tabs button").forEach((b) => {
+        b.classList.toggle("active", b.dataset.tab === name);
+      });
+      $("tabSummary").classList.toggle("panel-hidden", name !== "summary");
+      $("tabRaw").classList.toggle("panel-hidden", name !== "raw");
+    }
+
+    document.querySelector(".tabs").addEventListener("click", (e) => {
+      const btn = e.target.closest("button[data-tab]");
+      if (!btn) return;
+      switchTab(btn.dataset.tab);
+    });
+  </script>
+</body>
+</html>
