@@ -24,7 +24,7 @@ import {
   DialogTitle,
   DialogFooter,
 } from "@/components/ui/dialog";
-import { Search, User, FileText, Pill, ShieldCheck, AlertTriangle, CheckCircle, Loader2, LogOut } from "lucide-react";
+import { Search, User, FileText, Pill, ShieldCheck, AlertTriangle, CheckCircle, Loader2, LogOut, Mail } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import {
   getPatients,
@@ -54,6 +54,13 @@ export default function Index() {
   const [draftLetter, setDraftLetter] = useState<string | null>(null);
   const [draftError, setDraftError] = useState<string | null>(null);
   const [letterDialogOpen, setLetterDialogOpen] = useState(false);
+  const [sentDialogOpen, setSentDialogOpen] = useState(false);
+  const [sentDetails, setSentDetails] = useState<{
+    patientName: string;
+    planName: string;
+    drugName: string;
+    rxcui: string;
+  } | null>(null);
 
   // Step 1: Load patients
   const { data: patients, isLoading: loadingPatients } = useQuery({
@@ -550,12 +557,94 @@ export default function Index() {
                 >
                   Copy to Clipboard
                 </Button>
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    const selectedDrugOpt = rxcuiOptions?.find(
+                      (o) => o.rxcui === selectedRxcui
+                    );
+                    setSentDetails({
+                      patientName: patient?.patient_name ?? "N/A",
+                      planName: plan?.plan_name ?? "N/A",
+                      drugName: selectedDrugOpt?.name ?? submittedDrug ?? "N/A",
+                      rxcui: selectedRxcui ?? "N/A",
+                    });
+                    setLetterDialogOpen(false);
+                    setSentDialogOpen(true);
+                  }}
+                >
+                  <Mail className="h-4 w-4 mr-2" />
+                  Send Email for PA
+                </Button>
                 <Button onClick={() => setLetterDialogOpen(false)}>
                   Close
                 </Button>
               </DialogFooter>
             </>
           )}
+        </DialogContent>
+      </Dialog>
+
+      {/* ─── PA Sent Confirmation Dialog ─── */}
+      <Dialog open={sentDialogOpen} onOpenChange={setSentDialogOpen}>
+        <DialogContent className="max-w-md">
+          <div className="flex flex-col items-center text-center gap-4 py-4">
+            <div className="flex items-center justify-center h-14 w-14 rounded-full bg-green-100 dark:bg-green-900/30">
+              <CheckCircle className="h-8 w-8 text-green-600 dark:text-green-400" />
+            </div>
+
+            <div className="space-y-1">
+              <h2 className="text-xl font-semibold tracking-tight">
+                Prior Authorization Sent
+              </h2>
+              <p className="text-sm text-muted-foreground">
+                The PA request has been submitted to the insurance plan for review.
+              </p>
+            </div>
+
+            <div className="w-full rounded-lg border bg-muted/40 p-4 text-left space-y-2.5 text-sm">
+              {sentDetails && (
+                <>
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Patient</span>
+                    <span className="font-medium">{sentDetails.patientName}</span>
+                  </div>
+                  <Separator />
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Plan</span>
+                    <span className="font-medium text-right max-w-[60%]">{sentDetails.planName}</span>
+                  </div>
+                  <Separator />
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Drug</span>
+                    <span className="font-medium text-right max-w-[60%]">{sentDetails.drugName}</span>
+                  </div>
+                  <Separator />
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">RxCUI</span>
+                    <span className="font-medium">{sentDetails.rxcui}</span>
+                  </div>
+                  <Separator />
+                </>
+              )}
+              <div className="flex justify-between items-center">
+                <span className="text-muted-foreground">Status</span>
+                <Badge className="bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300 border-amber-200 dark:border-amber-800">
+                  Pending Review
+                </Badge>
+              </div>
+            </div>
+
+            <p className="text-xs text-muted-foreground">
+              You will be notified once the insurance provider responds. Typical turnaround is 2–5 business days.
+            </p>
+          </div>
+
+          <DialogFooter>
+            <Button className="w-full" onClick={() => setSentDialogOpen(false)}>
+              Done
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>
