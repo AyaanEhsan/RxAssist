@@ -6,6 +6,16 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Search, User, FileText, Pill, ShieldCheck, AlertTriangle, CheckCircle, Loader2 } from "lucide-react";
 import {
   getPatients,
@@ -25,6 +35,8 @@ export default function Index() {
   const [drugSearch, setDrugSearch] = useState("");
   const [submittedDrug, setSubmittedDrug] = useState<string | null>(null);
   const [selectedRxcui, setSelectedRxcui] = useState<string | null>(null);
+  const [priorAuthDialogOpen, setPriorAuthDialogOpen] = useState(false);
+  const [pendingEntry, setPendingEntry] = useState<FormularyEntry | null>(null);
 
   // Step 1: Load patients
   const { data: patients, isLoading: loadingPatients } = useQuery({
@@ -80,6 +92,21 @@ export default function Index() {
     setSubmittedDrug(null);
     setDrugSearch("");
     setSelectedRxcui(null);
+  };
+
+  const handleFormularyCardClick = (entry: FormularyEntry) => {
+    if (entry.prior_authorization_yn === "Y") {
+      setPendingEntry(entry);
+      setPriorAuthDialogOpen(true);
+    } else {
+      // TODO: navigate or take action for non-PA entries
+    }
+  };
+
+  const handleConfirmPriorAuth = () => {
+    // TODO: handle confirmed prior auth action (e.g. start PA workflow)
+    setPriorAuthDialogOpen(false);
+    setPendingEntry(null);
   };
 
   return (
@@ -296,13 +323,27 @@ export default function Index() {
               </CardHeader>
               <CardContent className="space-y-4">
                 {formularyResults.map((entry, i) => (
-                  <div key={i} className="border rounded-md p-4 space-y-3">
+                  <button
+                    key={i}
+                    type="button"
+                    onClick={() => handleFormularyCardClick(entry)}
+                    className="w-full text-left border rounded-lg p-4 space-y-4 transition-all hover:border-primary hover:shadow-md hover:bg-primary/5 cursor-pointer"
+                  >
                     <div className="flex items-center justify-between">
-                      <span className="text-sm font-medium">NDC: {entry.ndc}</span>
-                      <Badge variant="secondary">Tier {entry.tier_level_value ?? "N/A"}</Badge>
+                      <div className="space-y-0.5">
+                        <span className="text-sm font-semibold">NDC: {entry.ndc}</span>
+                        <div className="text-xs text-muted-foreground">
+                          RxCUI: {entry.rxcui} &middot; Version: {entry.formulary_version ?? "N/A"}
+                        </div>
+                      </div>
+                      <Badge variant="secondary" className="text-sm px-3 py-1">
+                        Tier {entry.tier_level_value ?? "N/A"}
+                      </Badge>
                     </div>
 
-                    <div className="grid grid-cols-2 gap-2">
+                    <Separator />
+
+                    <div className="grid grid-cols-2 gap-x-6 gap-y-2">
                       <StatusBadge
                         label="Prior Auth"
                         value={entry.prior_authorization_yn}
@@ -316,12 +357,19 @@ export default function Index() {
                         value={entry.quantity_limit_yn}
                       />
                       {entry.quantity_limit_yn === "Y" && (
-                        <div className="text-xs text-muted-foreground">
+                        <div className="flex items-center text-sm text-muted-foreground">
                           {entry.quantity_limit_amount} units / {entry.quantity_limit_days} days
                         </div>
                       )}
                     </div>
-                  </div>
+
+                    {entry.prior_authorization_yn === "Y" && (
+                      <div className="flex items-center gap-1.5 text-xs text-destructive pt-1">
+                        <AlertTriangle className="h-3.5 w-3.5" />
+                        Click to initiate Prior Authorization
+                      </div>
+                    )}
+                  </button>
                 ))}
               </CardContent>
             </Card>
@@ -337,6 +385,41 @@ export default function Index() {
           )}
         </div>
       </div>
+
+      <AlertDialog open={priorAuthDialogOpen} onOpenChange={setPriorAuthDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Prior Authorization Required</AlertDialogTitle>
+            <AlertDialogDescription>
+              This medication requires prior authorization. Are you sure you want to proceed?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          {pendingEntry && (
+            <div className="rounded-md border p-3 space-y-2 text-sm">
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">NDC</span>
+                <span className="font-medium">{pendingEntry.ndc}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">RxCUI</span>
+                <span className="font-medium">{pendingEntry.rxcui}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Tier</span>
+                <span className="font-medium">{pendingEntry.tier_level_value ?? "N/A"}</span>
+              </div>
+            </div>
+          )}
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => setPendingEntry(null)}>
+              Cancel
+            </AlertDialogCancel>
+            <AlertDialogAction onClick={handleConfirmPriorAuth}>
+              Yes, Proceed
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
