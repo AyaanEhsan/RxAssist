@@ -63,6 +63,19 @@ class PatientResponse(BaseModel):
     relevant_lab_results: Optional[dict] = None
 
 
+class FormularyResponse(BaseModel):
+    formulary_id: str
+    rxcui: str
+    ndc: str
+    formulary_version: Optional[int] = None
+    tier_level_value: Optional[int] = None
+    quantity_limit_yn: Optional[str] = None
+    quantity_limit_amount: Optional[str] = None
+    quantity_limit_days: Optional[str] = None
+    prior_authorization_yn: Optional[str] = None
+    step_therapy_yn: Optional[str] = None
+
+
 class PlanDetailsResponse(BaseModel):
     contract_name: Optional[str] = None
     plan_name: Optional[str] = None
@@ -181,6 +194,35 @@ def get_plan_details(
         )
 
     return PlanDetailsResponse(**response.data[0])
+
+
+@app.get("/formulary_for_provider", response_model=List[FormularyResponse])
+def get_formulary_coverage(
+    formulary_id: str,
+    rxcui: str,
+) -> List[FormularyResponse]:
+    response = (
+        supabase_client
+        .table("formulary")
+        .select(
+            "formulary_id, rxcui, ndc, formulary_version,"
+            "tier_level_value, quantity_limit_yn, quantity_limit_amount, "
+            "quantity_limit_days, prior_authorization_yn, step_therapy_yn"
+        )
+        .eq("formulary_id", formulary_id)
+        .eq("rxcui", rxcui)
+        .order("data_date", desc=True)
+        .limit(10)
+        .execute()
+    )
+
+    if not response.data:
+        raise HTTPException(
+            status_code=404,
+            detail=f"No formulary entry found for formulary_id={formulary_id}, rxcui={rxcui}",
+        )
+
+    return [FormularyResponse(**row) for row in response.data]
 
 
 @app.on_event("startup")
