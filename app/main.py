@@ -327,5 +327,82 @@ async def get_formulary_drugs_by_name(formulary_id: str, drug_name: str):
     }
 
 
+# ── Prior Auth Draft ─────────────────────────────────────────────────
 
+
+class PriorAuthDraftRequest(BaseModel):
+    # Patient
+    patient_name: str
+    primary_diagnosis_code: Optional[str] = None
+    primary_diagnosis_desc: Optional[str] = None
+    history_of_present_illness: Optional[str] = None
+    physical_exam_notes: Optional[str] = None
+    previous_failed_therapies: Optional[List[str]] = None
+    relevant_lab_results: Optional[dict] = None
+
+    # Insurance / Plan
+    contract_id: str
+    plan_id: str
+    segment_id: str
+    formulary_id: str
+    contract_name: Optional[str] = None
+    plan_name: Optional[str] = None
+    state: Optional[str] = None
+
+    # Drug
+    drug_name: str
+    rxcui: str
+    ndc: Optional[str] = None
+    tier_level_value: Optional[int] = None
+
+    # Coverage Rules
+    prior_authorization_yn: Optional[str] = None
+    step_therapy_yn: Optional[str] = None
+    quantity_limit_yn: Optional[str] = None
+    quantity_limit_amount: Optional[str] = None
+    quantity_limit_days: Optional[str] = None
+
+
+@app.post("/prior-auth/draft")
+def draft_prior_auth(req: PriorAuthDraftRequest):
+    payload = req.model_dump()
+
+    print("\n" + "=" * 60)
+    print("  PRIOR AUTH DRAFT REQUEST RECEIVED")
+    print("=" * 60)
+
+    print("\n── Patient ──")
+    print(f"  Name                      : {payload['patient_name']}")
+    print(f"  Primary Dx Code           : {payload['primary_diagnosis_code']}")
+    print(f"  Primary Dx Desc           : {payload['primary_diagnosis_desc']}")
+    print(f"  History of Present Illness: {payload['history_of_present_illness']}")
+    print(f"  Physical Exam Notes       : {payload['physical_exam_notes']}")
+    print(f"  Previous Failed Therapies : {payload['previous_failed_therapies']}")
+    print(f"  Relevant Lab Results      : {payload['relevant_lab_results']}")
+
+    print("\n── Insurance / Plan ──")
+    print(f"  Contract ID   : {payload['contract_id']}")
+    print(f"  Plan ID       : {payload['plan_id']}")
+    print(f"  Segment ID    : {payload['segment_id']}")
+    print(f"  Formulary ID  : {payload['formulary_id']}")
+    print(f"  Contract Name : {payload['contract_name']}")
+    print(f"  Plan Name     : {payload['plan_name']}")
+    print(f"  State         : {payload['state']}")
+
+    print("\n── Drug ──")
+    print(f"  Drug Name       : {payload['drug_name']}")
+    print(f"  RxCUI           : {payload['rxcui']}")
+    print(f"  NDC             : {payload['ndc']}")
+    print(f"  Tier Level Value: {payload['tier_level_value']}")
+
+    print("\n── Coverage Rules ──")
+    print(f"  Prior Auth Required : {payload['prior_authorization_yn']}")
+    print(f"  Step Therapy        : {payload['step_therapy_yn']}")
+    print(f"  Quantity Limit      : {payload['quantity_limit_yn']}")
+    print(f"  Quantity Limit Amt  : {payload['quantity_limit_amount']}")
+    print(f"  Quantity Limit Days : {payload['quantity_limit_days']}")
+
+    print("=" * 60 + "\n")
+
+    return {"status": "received", "payload": payload}
 
