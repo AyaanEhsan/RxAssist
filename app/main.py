@@ -12,6 +12,8 @@ import os
 from typing import Dict, List, Optional, Set, TypedDict
 from supabase import Client, create_client
 from pydantic import BaseModel
+from langchain_google_genai import ChatGoogleGenerativeAI
+from langchain_core.messages import HumanMessage, SystemMessage
 
 # from load_diffs import load_formulary_snapshot_for_rxcuis, diff_snapshots
 # from load_diffs import check_tier_updates_for_date_range
@@ -23,6 +25,13 @@ load_dotenv()
 url = os.getenv("SUPABASE_URL")
 key = os.getenv("SUPABASE_KEY")
 RXNAV_BASE = os.getenv("RXNAV_URL_BASE_FOR_DRUG_NAME_TO_RXCUIS")
+GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
+
+llm = ChatGoogleGenerativeAI(
+    model="gemini-3-flash-preview",
+    google_api_key=GEMINI_API_KEY,
+    temperature=0.3,
+)
 
 supabase_client: Client = create_client(url, key)
 DRUGS: list[str] = []
@@ -363,46 +372,83 @@ class PriorAuthDraftRequest(BaseModel):
     quantity_limit_days: Optional[str] = None
 
 
+PRIOR_AUTH_SYSTEM_PROMPT = """\
+You are a medical prior-authorization specialist AI.
+Given the structured patient, insurance, drug, and coverage data below,
+generate a **complete Prior Authorization request letter** that a physician's
+office could submit to the insurance plan.
+
+The letter MUST include all of the following sections:
+1. **Header** – Date, physician/practice placeholder, insurer name & plan.
+2. **Patient Information** – Name, diagnosis (ICD-10 code + description).
+3. **Medication Requested** – Drug name, RxCUI, NDC, tier level.
+4. **Clinical Justification** – Incorporate the history of present illness,
+   physical exam notes, previous failed therapies, and relevant lab results
+   to build a compelling medical-necessity argument.
+5. **Insurance Coverage Context** – Reference the formulary tier, whether
+   prior auth / step therapy / quantity limits apply, and the specific
+   quantity-limit amounts/days if present.
+6. **Conclusion** – A concise closing requesting approval.
+
+Use professional, formal medical language.  Output the letter in Markdown.
+"""
+
+
 @app.post("/prior-auth/draft")
-def draft_prior_auth(req: PriorAuthDraftRequest):
+async def draft_prior_auth(req: PriorAuthDraftRequest):
     payload = req.model_dump()
 
-    print("\n" + "=" * 60)
-    print("  PRIOR AUTH DRAFT REQUEST RECEIVED")
-    print("=" * 60)
 
-    print("\n── Patient ──")
-    print(f"  Name                      : {payload['patient_name']}")
-    print(f"  Primary Dx Code           : {payload['primary_diagnosis_code']}")
-    print(f"  Primary Dx Desc           : {payload['primary_diagnosis_desc']}")
-    print(f"  History of Present Illness: {payload['history_of_present_illness']}")
-    print(f"  Physical Exam Notes       : {payload['physical_exam_notes']}")
-    print(f"  Previous Failed Therapies : {payload['previous_failed_therapies']}")
-    print(f"  Relevant Lab Results      : {payload['relevant_lab_results']}")
+    user_prompt = f"""\
+                Generate a Prior Authorization request letter using the following data:
 
-    print("\n── Insurance / Plan ──")
-    print(f"  Contract ID   : {payload['contract_id']}")
-    print(f"  Plan ID       : {payload['plan_id']}")
-    print(f"  Segment ID    : {payload['segment_id']}")
-    print(f"  Formulary ID  : {payload['formulary_id']}")
-    print(f"  Contract Name : {payload['contract_name']}")
-    print(f"  Plan Name     : {payload['plan_name']}")
-    print(f"  State         : {payload['state']}")
+                ## Patient Information
+                - Patient Name: {payload['patient_name']}
+                - Primary Diagnosis Code (ICD-10): {payload['primary_diagnosis_code']}
+                - Primary Diagnosis Description: {payload['primary_diagnosis_desc']}
+                - History of Present Illness: {payload['history_of_present_illness']}
+                - Physical Exam Notes: {payload['physical_exam_notes']}
+                - Previous Failed Therapies: {payload['previous_failed_therapies']}
+                - Relevant Lab Results: {json.dumps(payload['relevant_lab_results']) if payload['relevant_lab_results'] else 'N/A'}
 
-    print("\n── Drug ──")
-    print(f"  Drug Name       : {payload['drug_name']}")
-    print(f"  RxCUI           : {payload['rxcui']}")
-    print(f"  NDC             : {payload['ndc']}")
-    print(f"  Tier Level Value: {payload['tier_level_value']}")
+                ## Insurance / Plan
+                - Contract ID: {payload['contract_id']}
+                - Plan ID: {payload['plan_id']}
+                - Segment ID: {payload['segment_id']}
+                - Formulary ID: {payload['formulary_id']}
+                - Contract Name: {payload['contract_name']}
+                - Plan Name: {payload['plan_name']}
+                - State: {payload['state']}
 
-    print("\n── Coverage Rules ──")
-    print(f"  Prior Auth Required : {payload['prior_authorization_yn']}")
-    print(f"  Step Therapy        : {payload['step_therapy_yn']}")
-    print(f"  Quantity Limit      : {payload['quantity_limit_yn']}")
-    print(f"  Quantity Limit Amt  : {payload['quantity_limit_amount']}")
-    print(f"  Quantity Limit Days : {payload['quantity_limit_days']}")
+                ## Medication Requested
+                - Drug Name: {payload['drug_name']}
+                - RxCUI: {payload['rxcui']}
+                - NDC: {payload['ndc']}
+                - Tier Level: {payload['tier_level_value']}
 
-    print("=" * 60 + "\n")
+                ## Coverage Rules
+                - Prior Authorization Required: {payload['prior_authorization_yn']}
+                - Step Therapy Required: {payload['step_therapy_yn']}
+                - Quantity Limit: {payload['quantity_limit_yn']}
+                - Quantity Limit Amount: {payload['quantity_limit_amount']}
+                - Quantity Limit Days: {payload['quantity_limit_days']}
+            """
 
-    return {"status": "received", "payload": payload}
+    messages = [
+        SystemMessage(content=PRIOR_AUTH_SYSTEM_PROMPT),
+        HumanMessage(content=user_prompt),
+    ]
+
+    response = await llm.ainvoke(messages)
+    draft_letter = response.content
+
+    print("\n── Generated Prior Auth Letter ──")
+    print(draft_letter)
+    print("── End of Letter ──\n")
+
+    return {
+        "status": "success",
+        "draft_letter": draft_letter,
+        "payload": payload,
+    }
 
