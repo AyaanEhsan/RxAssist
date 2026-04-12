@@ -1,6 +1,10 @@
 from __future__ import annotations
 
-from fastapi import FastAPI
+import json
+from pathlib import Path
+import httpx
+
+from fastapi import FastAPI, HTTPException
 
 from datetime import date
 import os
@@ -9,7 +13,7 @@ from supabase import Client, create_client
 from pydantic import BaseModel
 
 # from load_diffs import load_formulary_snapshot_for_rxcuis, diff_snapshots
-from load_diffs import check_tier_updates_for_date_range
+# from load_diffs import check_tier_updates_for_date_range
 
 from dotenv import load_dotenv
 
@@ -17,8 +21,12 @@ load_dotenv()
 
 url = os.getenv("SUPABASE_URL")
 key = os.getenv("SUPABASE_KEY")
+RXNAV_BASE = os.getenv("RXNAV_URL_BASE_FOR_DRUG_NAME_TO_RXCUIS")
 
 supabase_client: Client = create_client(url, key)
+DRUGS: list[str] = []
+
+
 
 if supabase_client:
     print("Supabase client created successfully")
@@ -37,6 +45,31 @@ class UpdateRequest(BaseModel):
     rxcuis: List[str]
     data_date_start: date
     data_date_end: date
+
+
+class PatientResponse(BaseModel):
+    id: int
+    patient_name: str
+    contract_id: str
+    plan_id: str
+    segment_id: str
+    formulary_id: str
+    rxcuis: List[str]
+    primary_diagnosis_code: Optional[str] = None
+    primary_diagnosis_desc: Optional[str] = None
+    history_of_present_illness: Optional[str] = None
+    physical_exam_notes: Optional[str] = None
+    previous_failed_therapies: Optional[List[str]] = None
+    relevant_lab_results: Optional[dict] = None
+
+
+class PlanDetailsResponse(BaseModel):
+    contract_name: Optional[str] = None
+    plan_name: Optional[str] = None
+    premium: Optional[float] = None
+    deductible: Optional[float] = None
+    state: Optional[str] = None
+    plan_suppressed_yn: Optional[str] = None
 
 # 2. Define a basic GET route
 @app.get("/")
@@ -86,3 +119,106 @@ def check_for_updates(payload: UpdateRequest) -> list:
         rxcuis=rxcuis,
         formulary_ids=fids,
     )
+
+
+
+
+
+
+
+
+@app.get("/patients")
+def list_patients(offset: int = 0, limit: int = 20):
+    response = (
+        supabase_client
+        .table("patients")
+        .select("id, patient_name")
+        .order("patient_name")
+        .range(offset, offset + limit - 1)
+        .execute()
+    )
+    return {"patients": response.data}
+
+
+@app.get("/patients/{patient_id}", response_model=PatientResponse)
+def get_patient(patient_id: int) -> PatientResponse:
+    response = (
+        supabase_client
+        .table("patients")
+        .select("*")
+        .eq("id", patient_id)
+        .single()
+        .execute()
+    )
+    return PatientResponse(**response.data)
+
+
+@app.get("/plans", response_model=PlanDetailsResponse)
+def get_plan_details(
+    contract_id: str,
+    plan_id: str,
+    segment_id: str,
+    formulary_id: str,
+) -> PlanDetailsResponse:
+    response = (
+        supabase_client
+        .table("plans")
+        .select("contract_name, plan_name, premium, deductible, state, plan_suppressed_yn")
+        .eq("contract_id", contract_id)
+        .eq("plan_id", plan_id)
+        .eq("segment_id", segment_id)
+        .eq("formulary_id", formulary_id)
+        .order("data_date", desc=True)
+        .limit(1)
+        .execute()
+    )
+
+    if not response.data:
+        raise HTTPException(
+            status_code=404,
+            detail=f"No plan found for contract_id={contract_id}, plan_id={plan_id}, "
+                   f"segment_id={segment_id}, formulary_id={formulary_id}",
+        )
+
+    return PlanDetailsResponse(**response.data[0])
+
+
+@app.on_event("startup")
+def load_drugs():
+    global DRUGS
+    drug_file = Path(__file__).parent / "assets" / "drugs.json"
+    with open(drug_file) as f:
+        DRUGS = json.load(f)["drugs"]
+
+
+@app.get("/drugs")
+def search_drugs(q: str = "", limit: int = 10) -> dict:
+    if not q:
+        return {"results": DRUGS[:limit]}
+
+    query_lower = q.lower()
+    matches = [drug for drug in DRUGS if drug.lower().startswith(query_lower)]
+    return {"results": matches[:limit]}
+
+
+@app.get("/drug-rxcuis/{drug_name}")
+async def get_drug_rxcuis(drug_name: str):
+    async with httpx.AsyncClient() as client:
+        response = await client.get(f"{RXNAV_BASE}{drug_name}")
+        response.raise_for_status()
+        data = response.json()
+    results = []
+    concept_groups = data.get("drugGroup", {}).get("conceptGroup", [])
+    for group in concept_groups:
+        for concept in group.get("conceptProperties", []):
+            results.append({
+                "rxcui": concept["rxcui"],
+                "name": concept["name"],
+                "synonym": concept["synonym"],
+                "status": "active" if concept.get("suppress") == "N" else "obsolete",
+            })
+    return {"drug": drug_name, "results": results}
+
+
+
+
