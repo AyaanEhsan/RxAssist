@@ -6,26 +6,16 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { AuthProvider, useAuth } from "@/contexts/AuthContext";
 import Index from "./pages/Index.tsx";
 import Login from "./pages/Login.tsx";
+import Patients from "./pages/Patients.tsx";
+import PatientReport from "./pages/PatientReport.tsx";
 import NotFound from "./pages/NotFound.tsx";
 
 const queryClient = new QueryClient();
 
-function AppRoutes() {
+function ProviderGate() {
   const { provider } = useAuth();
-
-  if (!provider) {
-    return <Login />;
-  }
-
-  return (
-    <BrowserRouter>
-      <Routes>
-        <Route path="/" element={<Index />} />
-        {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
-        <Route path="*" element={<NotFound />} />
-      </Routes>
-    </BrowserRouter>
-  );
+  if (!provider) return <Login />;
+  return <Index />;
 }
 
 const App = () => (
@@ -34,7 +24,15 @@ const App = () => (
       <TooltipProvider>
         <Toaster />
         <Sonner />
-        <AppRoutes />
+        <BrowserRouter>
+          <Routes>
+            <Route path="/" element={<ProviderGate />} />
+            <Route path="/patients" element={<Patients />} />
+            <Route path="/patient_report" element={<PatientReport />} />
+            {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
+            <Route path="*" element={<NotFound />} />
+          </Routes>
+        </BrowserRouter>
       </TooltipProvider>
     </AuthProvider>
   </QueryClientProvider>

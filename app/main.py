@@ -14,6 +14,7 @@ from supabase import Client, create_client
 from pydantic import BaseModel
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_core.messages import HumanMessage, SystemMessage
+from langchain_experimental.data_anonymizer import PresidioReversibleAnonymizer
 
 # from load_diffs import load_formulary_snapshot_for_rxcuis, diff_snapshots
 # from load_diffs import check_tier_updates_for_date_range
@@ -491,10 +492,12 @@ PRIOR_AUTH_SYSTEM_PROMPT = """\
     """
 
 
+PII_ANALYZED_FIELDS = ["PERSON", "PHONE_NUMBER", "EMAIL_ADDRESS"]
+
+
 @app.post("/prior-auth/draft")
 async def draft_prior_auth(req: PriorAuthDraftRequest):
     payload = req.model_dump()
-
 
     user_prompt = f"""\
                 Generate a Prior Authorization request letter using the following data:
@@ -535,9 +538,23 @@ async def draft_prior_auth(req: PriorAuthDraftRequest):
                 - Quantity Limit Days: {payload['quantity_limit_days']}
             """
 
+    # ── PII Anonymization ────────────────────────────────────────────
+    # Fresh instance per request so concurrent requests don't share state.
+    # spaCy's NER model is cached globally after the first load.
+    anonymizer = PresidioReversibleAnonymizer(
+        analyzed_fields=PII_ANALYZED_FIELDS,
+        faker_seed=42,
+    )
+    anonymized_prompt = anonymizer.anonymize(user_prompt)
+
+    print("\n── PII Anonymization Mapping ──")
+    print(json.dumps(anonymizer.deanonymizer_mapping, indent=2, default=str))
+    print("── Anonymized Prompt (sent to LLM) ──")
+    print(anonymized_prompt)
+
     messages = [
         SystemMessage(content=PRIOR_AUTH_SYSTEM_PROMPT),
-        HumanMessage(content=user_prompt),
+        HumanMessage(content=anonymized_prompt),
     ]
 
     response = await llm.ainvoke(messages)
@@ -550,13 +567,19 @@ async def draft_prior_auth(req: PriorAuthDraftRequest):
     else:
         draft_letter = content
 
-    print("\n── Generated Prior Auth Letter ──")
+    # ── PII Deanonymization ──────────────────────────────────────────
+    # Restore real names/values in the generated letter.
+    final_letter = anonymizer.deanonymize(draft_letter)
+
+    print("\n── Raw LLM Response (still anonymized) ──")
     print(draft_letter)
+    print("── Final Letter (deanonymized) ──")
+    print(final_letter)
     print("── End of Letter ──\n")
 
     return {
         "status": "success",
-        "draft_letter": draft_letter,
+        "draft_letter": final_letter,
         "payload": payload,
     }
 

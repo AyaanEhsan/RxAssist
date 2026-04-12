@@ -1,5 +1,6 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
+import { useLocation } from "react-router-dom";
 import ReactMarkdown from "react-markdown";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -43,7 +44,16 @@ import {
 
 export default function Index() {
   const { provider, logout } = useAuth();
+  const location = useLocation();
+  const navState = location.state as { selectedPatientId?: number } | null;
   const [selectedPatientId, setSelectedPatientId] = useState<number | null>(null);
+
+  useEffect(() => {
+    if (navState?.selectedPatientId) {
+      setSelectedPatientId(navState.selectedPatientId);
+      window.history.replaceState({}, "");
+    }
+  }, [navState?.selectedPatientId]);
   const [drugSearch, setDrugSearch] = useState("");
   const [submittedDrug, setSubmittedDrug] = useState<string | null>(null);
   const [selectedRxcui, setSelectedRxcui] = useState<string | null>(null);

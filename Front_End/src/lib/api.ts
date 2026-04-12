@@ -138,6 +138,36 @@ export interface PriorAuthDraftResponse {
   payload: Record<string, unknown>;
 }
 
+export interface TierCheckRequest {
+  formulary_ids: string[];
+  rxcuis: string[];
+  data_date_start: string;
+  data_date_end: string;
+}
+
+export interface TierCheckRow {
+  formulary_id: string;
+  rxcui: string;
+  ndc: string;
+  has_tier_changed: boolean;
+  [key: string]: unknown;
+}
+
+export async function checkForUpdates(
+  body: TierCheckRequest
+): Promise<TierCheckRow[]> {
+  const res = await fetch(`${BASE_URL}/check_for_updates`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(`${res.status}: ${text.slice(0, 800)}`);
+  }
+  return res.json();
+}
+
 export async function draftPriorAuth(
   body: PriorAuthDraftRequest
 ): Promise<PriorAuthDraftResponse> {
