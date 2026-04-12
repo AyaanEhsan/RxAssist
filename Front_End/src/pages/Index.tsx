@@ -387,27 +387,27 @@ export default function Index() {
       </div>
 
       <AlertDialog open={priorAuthDialogOpen} onOpenChange={setPriorAuthDialogOpen}>
-        <AlertDialogContent>
+        <AlertDialogContent className="max-w-lg">
           <AlertDialogHeader>
             <AlertDialogTitle>Prior Authorization Required</AlertDialogTitle>
             <AlertDialogDescription>
-              This medication requires prior authorization. Are you sure you want to proceed?
+              Would you like me to draft a personalized Prior Auth Form — based on patient history?
             </AlertDialogDescription>
           </AlertDialogHeader>
           {pendingEntry && (
-            <div className="rounded-md border p-3 space-y-2 text-sm">
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">NDC</span>
-                <span className="font-medium">{pendingEntry.ndc}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">RxCUI</span>
-                <span className="font-medium">{pendingEntry.rxcui}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">Tier</span>
-                <span className="font-medium">{pendingEntry.tier_level_value ?? "N/A"}</span>
-              </div>
+            <div className="rounded-md border p-4 space-y-2 text-sm">
+              <DetailRow label="Formulary ID" value={pendingEntry.formulary_id} />
+              <DetailRow label="RxCUI" value={pendingEntry.rxcui} />
+              <DetailRow label="NDC" value={pendingEntry.ndc} />
+              <DetailRow label="Formulary Version" value={pendingEntry.formulary_version != null ? String(pendingEntry.formulary_version) : "N/A"} />
+              <Separator />
+              <DetailRow label="Tier Level" value={pendingEntry.tier_level_value != null ? String(pendingEntry.tier_level_value) : "N/A"} />
+              <DetailRow label="Prior Authorization" value={pendingEntry.prior_authorization_yn === "Y" ? "Required" : "No"} highlight={pendingEntry.prior_authorization_yn === "Y"} />
+              <DetailRow label="Step Therapy" value={pendingEntry.step_therapy_yn === "Y" ? "Required" : "No"} highlight={pendingEntry.step_therapy_yn === "Y"} />
+              <DetailRow label="Quantity Limit" value={pendingEntry.quantity_limit_yn === "Y" ? "Required" : "No"} highlight={pendingEntry.quantity_limit_yn === "Y"} />
+              {pendingEntry.quantity_limit_yn === "Y" && (
+                <DetailRow label="Qty Allowance" value={`${pendingEntry.quantity_limit_amount ?? "—"} units / ${pendingEntry.quantity_limit_days ?? "—"} days`} />
+              )}
             </div>
           )}
           <AlertDialogFooter>
@@ -415,7 +415,7 @@ export default function Index() {
               Cancel
             </AlertDialogCancel>
             <AlertDialogAction onClick={handleConfirmPriorAuth}>
-              Yes, Proceed
+              Yes, Draft PA Form
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -429,6 +429,15 @@ function InfoRow({ label, value }: { label: string; value: string }) {
     <div className="flex justify-between text-sm">
       <span className="text-muted-foreground">{label}</span>
       <span className="font-medium text-right max-w-[60%]">{value}</span>
+    </div>
+  );
+}
+
+function DetailRow({ label, value, highlight }: { label: string; value: string; highlight?: boolean }) {
+  return (
+    <div className="flex justify-between">
+      <span className="text-muted-foreground">{label}</span>
+      <span className={`font-medium ${highlight ? "text-destructive" : ""}`}>{value}</span>
     </div>
   );
 }
