@@ -373,25 +373,118 @@ class PriorAuthDraftRequest(BaseModel):
 
 
 PRIOR_AUTH_SYSTEM_PROMPT = """\
-You are a medical prior-authorization specialist AI.
-Given the structured patient, insurance, drug, and coverage data below,
-generate a **complete Prior Authorization request letter** that a physician's
-office could submit to the insurance plan.
+    You are a medical prior-authorization specialist AI.
+    Given the structured patient, insurance, drug, and coverage data below,
+    generate a **complete Prior Authorization request letter** that a physician's
+    office could submit to the insurance plan.
 
-The letter MUST include all of the following sections:
-1. **Header** – Date, physician/practice placeholder, insurer name & plan.
-2. **Patient Information** – Name, diagnosis (ICD-10 code + description).
-3. **Medication Requested** – Drug name, RxCUI, NDC, tier level.
-4. **Clinical Justification** – Incorporate the history of present illness,
-   physical exam notes, previous failed therapies, and relevant lab results
-   to build a compelling medical-necessity argument.
-5. **Insurance Coverage Context** – Reference the formulary tier, whether
-   prior auth / step therapy / quantity limits apply, and the specific
-   quantity-limit amounts/days if present.
-6. **Conclusion** – A concise closing requesting approval.
+    The letter MUST include all of the following sections:
+    1. **Header** – Date, physician/practice placeholder, insurer name & plan.
+    2. **Patient Information** – Name, diagnosis (ICD-10 code + description).
+    3. **Medication Requested** – Drug name, RxCUI, NDC, tier level.
+    4. **History of Present Illness** – A dedicated narrative section describing
+    the patient's current condition, symptom onset, progression, and relevant
+    medical history as provided.
+    5. **Physical Exam** – A dedicated section summarizing the physical exam
+    findings, vitals, and any clinically significant observations.
+    6. **Clinical Justification** – Incorporate previous failed therapies and
+    relevant lab results to build a compelling medical-necessity argument
+    for why this specific medication is required.
+    7. **Insurance Coverage Context** – Reference the formulary tier, whether
+    prior auth / step therapy / quantity limits apply, and the specific
+    quantity-limit amounts/days if present.
+    8. **Conclusion** – A concise closing requesting approval.
 
-Use professional, formal medical language.  Output the letter in Markdown.
-"""
+    IMPORTANT – Static patient identifiers to ALWAYS include in the letter:
+    - Date of Birth: 1961-XX-XX
+    - Member ID: 954XXXXXX
+
+    TONE: Write as a real physician would — natural, direct, and human.
+    Avoid overly polished or templated AI-sounding language. Vary sentence
+    structure, use clinical shorthand where appropriate, and let the letter
+    read as if a doctor personally dictated it.
+
+    Use professional, formal medical language.
+
+    FORMAT: Your entire response must be professionally formatted Markdown.
+    - Use `#` / `##` / `###` headings to delineate each section.
+    - Use **bold** for key labels, drug names, and diagnosis codes.
+    - Use bullet lists or numbered lists for lab values, failed therapies,
+    and coverage-rule details — never dump them as run-on prose.
+    - Separate sections with blank lines so the document renders cleanly.
+    - Do NOT wrap the output in a Markdown code fence (```); return raw
+    Markdown text directly.
+
+    # Please take the below as an example output format ONLY not the exact output:
+    Example output Format:
+
+
+        Prior Authorization Request: Ofev (nintedanib) | 100MG | 60 capsules per 30 days
+            Date: October 24, 2023
+
+            To: Prior Authorization Department SELECT HEALTH OF SOUTH CAROLINA, INC. First Choice VIP Care (HMO D-SNP)
+
+            From: [Physician Name] [Practice Name] [Practice Address] [Phone/Fax Number]
+
+            Patient Information
+            Patient Name: John Doe
+            Date of Birth: 1961-XX-XX
+            Member ID: 954XXXXXX
+            Primary Diagnosis: C34.90 – Malignant neoplasm of unspecified part of bronchus or lung
+            Secondary Diagnosis: J84.112 – Idiopathic Pulmonary Fibrosis (IPF)
+            Medication Requested
+            Drug Name: nintedanib 100 MG Oral Capsule [Ofev]
+            RxCUI: 1592748
+            NDC: 597014360
+            Formulary Tier: Tier 5
+            Requested Quantity: 60 capsules per 30 days
+            History of Present Illness
+            Mr. Doe is a 68-year-old male presenting with a highly complex clinical profile involving concurrent metastatic non-small cell lung cancer (NSCLC) and progressive Idiopathic Pulmonary Fibrosis (IPF). Recent genomic profiling of his lung biopsy identified an EGFR Exon 19 deletion, necessitating targeted therapy with afatinib (Gilotrif).
+
+            Simultaneously, his IPF has demonstrated significant progression over the last 12 months, characterized by a steady decline in forced vital capacity (FVC). The patient is currently struggling with severe medication-induced nausea and vomiting (MINV), graded as Grade 3 refractory. This has resulted in a 10 lb weight loss and episodes of dehydration. Given his dual pulmonary pathologies, stabilizing his lung function with nintedanib is critical to his overall survival and ability to tolerate his oncologic regimen.
+
+            Physical Exam
+            Vitals: BP 128/82, HR 88, RR 20, SpO2 91% on room air.
+            General: Chronically ill-appearing and mildly cachectic; however, he is in no acute distress.
+            Respiratory: Bilateral fine end-inspiratory "velcro-like" crackles are prominent at the lung bases. Breath sounds are notably decreased in the right upper lobe.
+            Cardiovascular: Regular rate and rhythm; no murmurs noted.
+            Extremities: 1+ pitting edema bilaterally; moderate digital clubbing is present, consistent with chronic hypoxia and interstitial disease.
+            Clinical Justification
+            The initiation of Ofev (nintedanib) is medically necessary for this patient to slow the decline of his pulmonary function. Mr. Doe has already failed the primary alternative for IPF due to significant adverse effects.
+
+            Previous Failed Therapies:
+
+            Pirfenidone: Discontinued due to severe GI intolerance and clinically significant elevation of LFTs.
+            Erlotinib: Intolerant due to Grade 3 skin rash (relevant to his concurrent NSCLC management).
+            Ondansetron 8mg & Prochlorperazine: Both failed to control his refractory nausea, necessitating a more aggressive anti-emetic strategy (aprepitant) alongside his oral oncolytics and the requested nintedanib.
+            Relevant Lab & Diagnostic Results:
+
+            FVC: 62% predicted (indicating significant restrictive impairment).
+            DLCO: 55% predicted.
+            EGFR Status: Positive (Exon 19 deletion).
+            Liver Function: ALT 28 U/L, AST 32 U/L, Bilirubin 0.8 mg/dL (currently stable, making him a candidate for nintedanib after failing pirfenidone).
+            Weight: Recent 10 lb loss due to GI distress.
+            Nintedanib is the most appropriate choice for this patient given his history of hepatotoxicity and GI intolerance with pirfenidone. Stabilizing his FVC is paramount, as his respiratory reserve is already compromised (SpO2 91% RA).
+
+            Insurance Coverage Context
+            We acknowledge that Ofev is a Tier 5 medication under the First Choice VIP Care (HMO D-SNP) formulary and requires Prior Authorization.
+
+            Prior Authorization Required: Yes
+            Step Therapy Required: No
+            Quantity Limit: Yes (60 capsules per 30 days)
+            The requested dosage of 100 mg BID (60 capsules per 30 days) aligns exactly with the plan's quantity limit requirements and standard dosing for IPF.
+
+            Conclusion
+            Given Mr. Doe’s progressive interstitial lung disease, his concurrent metastatic NSCLC, and his failure of previous therapies, I am requesting an immediate approval for Ofev 100 mg. Delaying treatment risks further irreversible loss of pulmonary function.
+
+            Please contact my office at [Phone Number] if any further clinical documentation is required.
+
+            Best regards,
+
+            [Physician Signature]
+
+            [Physician Name, Credentials]
+    """
 
 
 @app.post("/prior-auth/draft")
