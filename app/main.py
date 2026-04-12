@@ -231,6 +231,27 @@ def get_formulary_coverage(
     return [FormularyResponse(**row) for row in response.data]
 
 
+@app.get("/formulary/{formulary_id}/rxcuis")
+def get_rxcuis_by_formulary(formulary_id: str) -> dict:
+    response = (
+        supabase_client
+        .table("formulary")
+        .select("rxcui")
+        .eq("formulary_id", formulary_id)
+        .execute()
+    )
+
+    if not response.data:
+        return {"formulary_id": formulary_id, "rxcuis": [], "count": 0}
+
+    unique_rxcuis = sorted({row["rxcui"] for row in response.data})
+    return {
+        "formulary_id": formulary_id,
+        "rxcuis": unique_rxcuis,
+        "count": len(unique_rxcuis),
+    }
+
+
 @app.on_event("startup")
 def load_drugs():
     global DRUGS
@@ -266,6 +287,44 @@ async def get_drug_rxcuis(drug_name: str):
                 "status": "active" if concept.get("suppress") == "N" else "obsolete",
             })
     return {"drug": drug_name, "results": results}
+
+
+@app.get("/formulary/{formulary_id}/drug-lookup/{drug_name}")
+async def get_formulary_drugs_by_name(formulary_id: str, drug_name: str):
+    async with httpx.AsyncClient() as client:
+        resp = await client.get(f"{RXNAV_BASE}{drug_name}")
+        resp.raise_for_status()
+        data = resp.json()
+
+    all_drug_results = []
+    concept_groups = data.get("drugGroup", {}).get("conceptGroup", [])
+    for group in concept_groups:
+        for concept in group.get("conceptProperties", []):
+            all_drug_results.append({
+                "rxcui": concept["rxcui"],
+                "name": concept["name"],
+                "synonym": concept["synonym"],
+                "status": "active" if concept.get("suppress") == "N" else "obsolete",
+            })
+
+    formulary_resp = (
+        supabase_client
+        .table("formulary")
+        .select("rxcui")
+        .eq("formulary_id", formulary_id)
+        .execute()
+    )
+    covered_rxcuis: Set[str] = {row["rxcui"] for row in (formulary_resp.data or [])}
+
+    covered_drugs = [d for d in all_drug_results if d["rxcui"] in covered_rxcuis]
+
+    return {
+        "drug": drug_name,
+        "formulary_id": formulary_id,
+        "covered_results": covered_drugs,
+        "total_rxcuis_found": len(all_drug_results),
+        "covered_count": len(covered_drugs),
+    }
 
 
 
