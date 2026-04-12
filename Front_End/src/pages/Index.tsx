@@ -24,7 +24,6 @@ import {
   DialogTitle,
   DialogFooter,
 } from "@/components/ui/dialog";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import { Search, User, FileText, Pill, ShieldCheck, AlertTriangle, CheckCircle, Loader2 } from "lucide-react";
 import {
   getPatients,
@@ -519,11 +518,11 @@ export default function Index() {
 
           {draftLetter && (
             <>
-              <ScrollArea className="flex-1 min-h-0 rounded-md border p-6">
+              <div className="overflow-y-auto max-h-[calc(90vh-12rem)] rounded-md border p-6">
                 <article className="prose prose-sm max-w-none dark:prose-invert">
                   <ReactMarkdown>{draftLetter}</ReactMarkdown>
                 </article>
-              </ScrollArea>
+              </div>
               <DialogFooter className="gap-2 sm:gap-0">
                 <Button
                   variant="outline"
