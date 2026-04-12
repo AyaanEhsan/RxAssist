@@ -340,6 +340,10 @@ async def get_formulary_drugs_by_name(formulary_id: str, drug_name: str):
 
 
 class PriorAuthDraftRequest(BaseModel):
+    # Physician / Practice
+    physician_name: str
+    practice_name: str
+
     # Patient
     patient_name: str
     primary_diagnosis_code: Optional[str] = None
@@ -494,6 +498,10 @@ async def draft_prior_auth(req: PriorAuthDraftRequest):
 
     user_prompt = f"""\
                 Generate a Prior Authorization request letter using the following data:
+
+                ## Physician / Practice
+                - Physician Name: {payload['physician_name']}
+                - Practice Name: {payload['practice_name']}
 
                 ## Patient Information
                 - Patient Name: {payload['patient_name']}

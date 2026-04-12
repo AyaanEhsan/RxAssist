@@ -101,6 +101,9 @@ export async function getFormularyCoverage(
 }
 
 export interface PriorAuthDraftRequest {
+  physician_name: string;
+  practice_name: string;
+
   patient_name: string;
   primary_diagnosis_code?: string;
   primary_diagnosis_desc?: string;

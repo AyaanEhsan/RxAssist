@@ -129,6 +129,9 @@ export default function Index() {
     const drugName = selectedDrugOption?.name ?? submittedDrug ?? "Unknown";
 
     const body: PriorAuthDraftRequest = {
+      physician_name: provider?.physicianName ?? "",
+      practice_name: provider?.practiceName ?? "",
+
       patient_name: patient.patient_name,
       primary_diagnosis_code: patient.primary_diagnosis_code,
       primary_diagnosis_desc: patient.primary_diagnosis_desc,
