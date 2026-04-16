@@ -16,6 +16,18 @@ RxAssist combines **insurance formulary data**, **plan context**, and **patient-
 
 ---
 
+## Screenshots
+
+**Sign in** — enter provider credentials to open the workspace.
+
+![Sign in to RxAssist](docs/screenshots/sign-in.png)
+
+**Patients** — browse and search patients; open a record for formulary coverage or prior authorization drafting.
+
+![RxAssist Patients dashboard](docs/screenshots/patients-dashboard.png)
+
+---
+
 ## Quickstart
 
 From the **`RxAssist/`** directory:
