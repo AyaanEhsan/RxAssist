@@ -11,6 +11,18 @@ Based on the code in this repository, the main workflow is:
 5. show coverage rules such as tier, prior authorization, step therapy, and quantity limits,
 6. generate a prior authorization draft letter from structured patient, plan, and medication data.
 
+## Privacy-first AI drafting (PII masking)
+
+Prior authorization drafts are generated with a **cloud LLM**, but **raw personally identifiable information is not sent to the model**. On the `/prior-auth/draft` route in `app/main.py`, RxAssist uses **Microsoft Presidio** (via LangChain’s `PresidioReversibleAnonymizer` and the `presidio-anonymizer` dependency) to detect **person names, phone numbers, and email addresses**, replace them with reversible placeholders for the API call, then **deanonymize** the model’s Markdown so the returned letter still contains the correct real-world identifiers.
+
+A **fresh anonymizer instance is created per request** so concurrent users do not share deanonymization state.
+
+For healthcare settings, this is a **cost-effective and strong privacy posture**: you get modern generative drafting **without** paying for a full on-premises foundation model stack, while **materially reducing exposure** of patient and provider contact identifiers to third-party inference APIs—often the most practical “secure enough + affordable” bridge between innovation and duty of care around PHI.
+
+## Project overview presentation
+
+A slide deck that explains the product and technical flow is included in this folder: **`RxAssist-Presentation.pptx`**.
+
 ## What The Project Is About
 
 RxAssist is built around a practical problem: medication access is not only a clinical decision, but also an insurance and documentation workflow.
@@ -100,7 +112,7 @@ The backend currently defines routes for:
 - `/drug-rxcuis/{drug_name}` to query RxNav and return RxCUI matches
 - `/formulary/{formulary_id}/drug-lookup/{drug_name}` to combine RxNav results with formulary filtering
 - `/check_for_updates` to compare formulary tier changes across a date range for selected `formulary_id` and `rxcui` values
-- `/prior-auth/draft` to generate a prior authorization request letter
+- `/prior-auth/draft` to generate a prior authorization request letter (with **Presidio reversible PII masking** before the LLM call and **deanonymization** of the response)
 
 The backend is where the project logic lives. It is responsible for:
 
